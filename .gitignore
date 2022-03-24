@@ -1,0 +1,14 @@
+# python
+.venv/
+__pycache__/
+*.egg-info
+*pb2*
+
+# build
+.tox/
+build/
+target/
+dist/
+
+# IDE
+.vscode/
