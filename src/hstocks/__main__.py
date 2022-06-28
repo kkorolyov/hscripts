@@ -30,9 +30,9 @@ def main():
         config = yaml.load(fc, yaml.Loader)
 
         with open(config["file"], "a") as f:
+            f.write("\n")
             for ticker in config["symbols"]:
                 f.write(f"{fetch(ticker)}\n")
-            f.write("\n")
 
 
 if __name__ == "__main__":
