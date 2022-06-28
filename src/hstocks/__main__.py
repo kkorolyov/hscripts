@@ -19,7 +19,7 @@ tickers - array of ticker symbols to fetch
 
 def fetch(ticker):
     date = datetime.now().date().isoformat()
-    price = Ticker(ticker).history(period="1d")["Close"][0]
+    price = Ticker(ticker).history(period="5d")["Close"][0]
     return f"P {date} {ticker} {price}"
 
 
