@@ -1,7 +1,7 @@
 import argparse
 from datetime import datetime
+import sys
 
-import yaml
 from yfinance import Ticker
 
 parser = argparse.ArgumentParser(
@@ -9,30 +9,46 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawTextHelpFormatter,
 )
 parser.add_argument(
-    "file",
-    help="""configuration YAML file path containing:
-file - path of file to append prices to
-tickers - array of ticker symbols to fetch
-""",
+    "tickers",
+    type=str,
+    nargs="*",
+    help="tickers to fetch",
+)
+parser.add_argument(
+    "--output", "-o", type=str, required=True, help="ledger file to write output to"
 )
 
 
 def fetch(ticker):
+    print(f"fetching ticker: {ticker}...")
+
     date = datetime.now().date().isoformat()
     price = Ticker(ticker).history(period="5d")["Close"][-1]
+
+    print(f"fetched ticker: {ticker} at {price}")
+
     return f"P {date} {ticker} {price}"
 
 
 def main():
     args = parser.parse_args()
 
-    with open(args.file) as fc:
-        config = yaml.load(fc, yaml.Loader)
+    tickers = (
+        args.tickers
+        if sys.stdin.isatty()
+        else [t for t in sys.stdin.read().splitlines() if len(t)]
+    )
+    output = args.output
 
-        with open(config["file"], "a") as f:
-            f.write("\n")
-            for ticker in config["symbols"]:
+    print(f"fetching prices for {tickers}...")
+
+    with open(output, "a") as f:
+        f.write("\n")
+        for ticker in tickers:
+            try:
                 f.write(f"{fetch(ticker)}\n")
+            except Exception:
+                print(f"not a valid ticker: {ticker}")
 
 
 if __name__ == "__main__":
