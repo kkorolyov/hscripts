@@ -1,0 +1,11 @@
+[build-system]
+requires = ["setuptools>=69.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hstocks"
+version = "0.1.0"
+dependencies = ["yfinance"]
+
+[project.scripts]
+hstocks = "hstocks.__main__:main"
