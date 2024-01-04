@@ -1,11 +1,11 @@
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 import sys
 
 from yfinance import Ticker
 
 parser = argparse.ArgumentParser(
-    description="Fetches and appends current stock closing prices",
+    description="Fetches and appends stock closing prices to a ledger file",
     formatter_class=argparse.RawTextHelpFormatter,
 )
 parser.add_argument(
@@ -15,19 +15,49 @@ parser.add_argument(
     help="tickers to fetch",
 )
 parser.add_argument(
-    "--output", "-o", type=str, required=True, help="ledger file to write output to"
+    "-o",
+    "--output",
+    type=str,
+    required=True,
+    help="ledger file to write output to",
+)
+parser.add_argument(
+    "-s",
+    "--start",
+    type=str,
+    help="start date in ISO (YYYY-MM-DD) format",
+    default=datetime.today().date().isoformat(),
+)
+parser.add_argument(
+    "-e",
+    "--end",
+    type=str,
+    help="end date in ISO (YYYY-MM-DD) format",
+    default=(datetime.today() + timedelta(days=1)).date().isoformat(),
+)
+parser.add_argument(
+    "-i",
+    "--interval",
+    type=str,
+    choices=["1d", "5d", "1wk", "1mo", "3mo"],
+    help="interval between fetched prices",
+    default="1d",
 )
 
 
-def fetch(ticker):
+def fetch(ticker: str, start: str, end: str, interval: str):
     print(f"fetching ticker: {ticker}...")
 
-    date = datetime.now().date().isoformat()
-    price = Ticker(ticker).history(period="5d")["Close"][-1]
+    history = Ticker(ticker).history(start=start, end=end, interval=interval)
 
-    print(f"fetched ticker: {ticker} at {price}")
+    results = [
+        f"P {row.Index.date().isoformat()} {ticker} {row.Close}"
+        for row in history.itertuples()
+    ]
 
-    return f"P {date} {ticker} {price}"
+    print(f"fetched {len(results)} results for ticker: {ticker}")
+
+    return "\n".join(results)
 
 
 def main():
@@ -39,16 +69,16 @@ def main():
         else [t for t in sys.stdin.read().splitlines() if len(t)]
     )
     output = args.output
+    start = args.start
+    end = args.end
+    interval = args.interval
 
     print(f"fetching prices for {tickers}...")
 
     with open(output, "a") as f:
         f.write("\n")
         for ticker in tickers:
-            try:
-                f.write(f"{fetch(ticker)}\n")
-            except Exception:
-                print(f"not a valid ticker: {ticker}")
+            f.write(f"{fetch(ticker, start, end, interval)}\n")
 
 
 if __name__ == "__main__":
