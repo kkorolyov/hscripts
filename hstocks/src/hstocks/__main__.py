@@ -48,7 +48,9 @@ parser.add_argument(
 def fetch(ticker: str, start: str, end: str, interval: str):
     print(f"fetching ticker: {ticker}...")
 
-    history = Ticker(ticker).history(start=start, end=end, interval=interval)
+    history = Ticker(ticker).history(
+        start=start, end=end, interval=interval, period="5d"
+    )
 
     results = [
         f"P {row.Index.date().isoformat()} {ticker} {row.Close}"
@@ -73,12 +75,19 @@ def main():
     end = args.end
     interval = args.interval
 
-    print(f"fetching prices for {tickers}...")
+    print(f"fetching prices for {len(tickers)} tickers: {tickers}...")
+    results = [
+        t for t in (fetch(ticker, start, end, interval) for ticker in tickers) if len(t)
+    ]
+    print(f"fetched {len(results)} prices:")
 
-    with open(output, "a") as f:
-        f.write("\n")
-        for ticker in tickers:
-            f.write(f"{fetch(ticker, start, end, interval)}\n")
+    if len(results):
+        with open(output, "a") as f:
+            f.write("\n")
+            for result in results:
+                print(result)
+                f.write(result)
+                f.write("\n")
 
 
 if __name__ == "__main__":
