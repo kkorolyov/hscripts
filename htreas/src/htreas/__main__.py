@@ -1,4 +1,5 @@
 import argparse
+from os import environ
 import re
 import subprocess
 
@@ -10,11 +11,7 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawTextHelpFormatter,
 )
 parser.add_argument(
-    "-i",
-    "--input",
-    type=str,
-    required=True,
-    help="ledger file to read commodities from",
+    "-i", "--input", type=str, help="ledger file to read commodities from"
 )
 parser.add_argument(
     "-o", "--output", type=str, required=True, help="ledger file to write output to"
@@ -55,7 +52,7 @@ def formatTreasury(text: str):
 
 def main():
     args = parser.parse_args()
-    input = args.input
+    input = args.input or environ["LEDGER_FILE"]
     output = args.output
 
     commodities = fetchCommodities(input)
