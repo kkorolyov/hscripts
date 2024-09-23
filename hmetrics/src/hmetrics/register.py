@@ -6,6 +6,8 @@ from hmetrics import commodity
 
 
 class Balance:
+    """A commodity amount."""
+
     amount: float
     commodity: str
 
@@ -18,22 +20,19 @@ class Balance:
             self.amount = float(data)
             self.commodity = "USD"
 
-    def value(self, date: str) -> float:
-        """Returns the total value of this balance at `date`."""
-
-        return self.amount * commodity.value(self.commodity, date)
-
     def __repr__(self) -> str:
         return f"{self.amount} {self.commodity}"
 
 
 @total_ordering
-class Row:
+class Transaction:
+    """Balances at a particular date."""
+
     date: str
     balances: list[Balance]
 
-    def __init__(self, data: Union[list[str], "Row"]) -> None:
-        if isinstance(data, Row):
+    def __init__(self, data: Union[list[str], "Transaction"]) -> None:
+        if isinstance(data, Transaction):
             self.date = data.date
             self.balances = data.balances
         else:
@@ -45,22 +44,24 @@ class Row:
 
         total = 0
         for balance in self.balances:
-            total += balance.value(self.date)
+            total += balance.amount * commodity.value(balance.commodity, self.date)
         return total
 
     def __eq__(self, value: object) -> bool:
-        return isinstance(value, Row) and self.date == value.date
+        return isinstance(value, Transaction) and self.date == value.date
 
     def __lt__(self, value: object) -> bool:
-        return isinstance(value, Row) and self.date < value.date
+        return isinstance(value, Transaction) and self.date < value.date
 
     def __repr__(self) -> str:
         return f"{self.date} {self.balances}"
 
 
 class Register:
+    """Transactions for a particular account."""
+
     account: str
-    rows: list[Row]
+    transactions: list[Transaction]
 
     def __init__(self, account: str, data: Iterable[str], delimiter: str) -> None:
         self.account = account
@@ -69,67 +70,73 @@ class Register:
         # skip headers
         next(reader)
 
-        self.rows = sorted(Row(t) for t in reader)
+        self.transactions = sorted(Transaction(t) for t in reader)
 
     def dates(self) -> set[str]:
         """Returns all unique transaction dates in this register."""
 
-        return set(t.date for t in self.rows)
+        return set(t.date for t in self.transactions)
 
     def fill(self, dates: list[str]):
-        """Generates filler rows for provided dates not matching those already in this register."""
+        """
+        Generates filler rows for provided dates not matching those already in this register.
+        If the filler row would have a value of `0`, it is omitted.
+        """
 
-        if not len(self.rows) or not len(dates):
+        if not len(self.transactions) or not len(dates):
             return
 
-        newRows = []
+        newTransactions = []
 
         datesI = 0
-        rowsI = 0
+        transactionsI = 0
 
         while datesI < len(dates):
             date = dates[datesI]
-            row = self.rows[min(len(self.rows) - 1, rowsI)]
-            rowDate = row.date
+            transaction = self.transactions[
+                min(len(self.transactions) - 1, transactionsI)
+            ]
 
             # backfill
-            if date < rowDate:
+            if date < transaction.date:
                 # only backfill between entries
-                if rowsI > 0:
+                if transactionsI > 0:
                     # if next entry non-0
-                    if row.value() != 0:
+                    if transaction.value() != 0:
                         # fill with the next nearest row
-                        newRow = Row(row)
+                        newRow = Transaction(transaction)
                         newRow.date = date
-                        newRows.append(newRow)
+                        newTransactions.append(newRow)
                         # increment the fill cursor
                         datesI += 1
                     else:
                         # get to next matching date
-                        while date < rowDate:
+                        while date < transaction.date:
                             datesI += 1
                             date = dates[datesI]
                 else:
                     datesI += 1
-            elif date > rowDate:
+            elif date > transaction.date:
                 # infill
-                if rowsI < len(self.rows) - 1:
+                if transactionsI < len(self.transactions) - 1:
                     # infill until matches date
-                    while rowsI < len(self.rows) and date > rowDate:
-                        newRows.append(row)
-                        rowsI += 1
-                        if rowsI < len(self.rows):
-                            row = self.rows[rowsI]
-                            rowDate = row.date
+                    while (
+                        transactionsI < len(self.transactions)
+                        and date > transaction.date
+                    ):
+                        newTransactions.append(transaction)
+                        transactionsI += 1
+                        if transactionsI < len(self.transactions):
+                            transaction = self.transactions[transactionsI]
                 # postfill
                 else:
                     # fill with prev only if non-0
-                    if row.value() != 0:
+                    if transaction.value() != 0:
                         # fill with the prev nearest row for the remaining dates
                         while datesI < len(dates):
-                            newRow = Row(row)
+                            newRow = Transaction(transaction)
                             newRow.date = date
-                            newRows.append(newRow)
+                            newTransactions.append(newRow)
                             # increment fill cursor
                             datesI += 1
                             if datesI < len(dates):
@@ -139,11 +146,11 @@ class Register:
                         break
             # dates match - just copy current row and continue
             else:
-                newRows.append(row)
+                newTransactions.append(transaction)
                 datesI += 1
-                rowsI += 1
+                transactionsI += 1
 
-        self.rows = newRows
+        self.transactions = newTransactions
 
     def __repr__(self) -> str:
-        return f"{self.account} {self.rows}"
+        return f"{self.account} {self.transactions}"
