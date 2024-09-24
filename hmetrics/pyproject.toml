@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "hmetrics"
 version = "0.1.0"
-dependencies = ["yfinance"]
+dependencies = ["yfinance", "influxdb-client"]
 
 [project.scripts]
 hmetrics = "hmetrics.__main__:main"

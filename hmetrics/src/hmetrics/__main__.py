@@ -1,104 +1,91 @@
-import subprocess
+import datetime
 from argparse import ArgumentParser, RawTextHelpFormatter
 from os import environ
 
-from hmetrics import commodity
-from hmetrics.register import Register
+from influxdb_client.client.influxdb_client import InfluxDBClient
+from influxdb_client.client.write.point import Point
+from influxdb_client.client.write_api import SYNCHRONOUS
 
+from hmetrics import commodity
+from hmetrics.ledger import Ledger, Transaction
 
 parser = ArgumentParser(
     description="Emits current ledger file metrics",
     formatter_class=RawTextHelpFormatter,
 )
-parser.add_argument("-i", "--input", type=str, help="ledger file to read")
+parser.add_argument(
+    "-i", "--input", type=str, help="ledger file to read; defaults to $LEDGER_FILE"
+)
+parser.add_argument(
+    "-u", "--url", type=str, help="InfluxDB URL to write to", required=True
+)
+parser.add_argument(
+    "-t", "--token", type=str, help="InfluxDB token to use", required=True
+)
+parser.add_argument(
+    "-o", "--org", type=str, help="InfluxDB org to write to", required=True
+)
+parser.add_argument(
+    "-b", "--bucket", type=str, help="InfluxDB bucket to write to", required=True
+)
 
 
-def getAccounts(path: str):
-    return (
-        subprocess.check_output(["hledger", "accounts", "-f", path])
-        .decode()
-        .splitlines()
-    )
+def _loadStocks(transactions: list[Transaction]):
+    stockTransactions: dict[str, list[datetime.datetime]] = {}
 
+    for transaction in transactions:
+        if commodity.typeOf(transaction.commodity) == "stock":
+            entry = stockTransactions.setdefault(
+                transaction.commodity, [transaction.time, transaction.time]
+            )
+            entry[0] = min(entry[0], transaction.time)
+            entry[1] = max(entry[1], transaction.time)
 
-def getRegister(path: str, account: str, delimiter: str):
-    return Register(
-        account,
-        subprocess.check_output(
-            ["hledger", "aregister", account, "-O", "tsv", "-f", path]
-        )
-        .decode()
-        .splitlines(),
-        delimiter,
-    )
-
-
-def toRows(registers: list[Register], delimiter: str):
-    # bulk preload all stocks
-    stockTransactions: dict[str, list[str]] = {}
-    for register in registers:
-        for row in register.transactions:
-            for balance in row.balances:
-                if commodity.typeOf(balance.commodity) == "stock":
-                    entry = stockTransactions.setdefault(
-                        balance.commodity, [row.date, row.date]
-                    )
-                    entry[0] = min(entry[0], row.date)
-                    entry[1] = max(entry[1], row.date)
     for stock, (start, end) in stockTransactions.items():
-        commodity.loadTicker(stock, start, end)
-
-    # get all dates some transaction occurred
-    dates = set()
-    for register in registers:
-        for date in register.dates():
-            dates.add(date)
-    dates = sorted(dates)
-
-    # expand all registers to have transactions for all known dates
-    for register in registers:
-        register.fill(dates)
-
-    return "\n".join(
-        (
-            delimiter.join(("date", "total", "account", "type")),
-            *(
-                delimiter.join(
-                    (
-                        transaction.date,
-                        str(balance.amount),
-                        register.account,
-                        balance.commodity,
-                    )
-                )
-                for register in registers
-                for transaction in register.transactions
-                for balance in transaction.balances
-            ),
-            *(
-                delimiter.join(
-                    (
-                        transaction.date,
-                        str(transaction.value()),
-                        register.account,
-                        "value",
-                    )
-                )
-                for register in registers
-                for transaction in register.transactions
-            ),
-        )
-    )
+        commodity.loadTicker(stock, start, end + datetime.timedelta(days=1))
 
 
 def main():
     args = parser.parse_args()
-    input = args.input or environ["LEDGER_FILE"]
 
-    accounts = getAccounts(input)
-    assets = [getRegister(input, t, "\t") for t in accounts if t.startswith("assets")]
+    # fetch ledger data
+    ledger = Ledger(args.input or environ["LEDGER_FILE"])
 
-    print(toRows(assets, "\t"))
+    accounts = ledger.accounts()
+    print(f"found {len(accounts)} accounts")
+
+    assets = ledger.transactions("assets")
+
+    # combine all transactions for further processing
+    transactions = [*assets]
+    print(f"found {len(transactions)} transactions")
+
+    # bulk preload all stocks
+    _loadStocks(assets)
+
+    # generate points to write
+    points = [
+        Point.measurement("transaction")
+        .field("quantity", transaction.quantity)
+        .field(
+            "value",
+            transaction.quantity
+            * commodity.value(transaction.commodity, transaction.time),
+        )
+        .tag("account", transaction.account)
+        .tag("commodity", transaction.commodity)
+        .time(transaction.time)
+        for transaction in transactions
+    ]
+
+    # write to InfluxDB
+    with InfluxDBClient(args.url, args.token, org=args.org) as client:
+        print(f"writing {len(points)} points...")
+        with client.write_api(write_options=SYNCHRONOUS) as api:
+            api.write(
+                args.bucket,
+                record=points,
+            )
 
 
 if __name__ == "__main__":
