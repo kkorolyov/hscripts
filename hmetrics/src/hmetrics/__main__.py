@@ -73,7 +73,7 @@ def main():
                     ),
                 )
             ),
-            lambda t: (t.time, t.account, t.commodity),
+            lambda t: (t.account, t.commodity),
             lambda t: t.quantity,
             0.0,
         )
