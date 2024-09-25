@@ -11,7 +11,7 @@ class CommodityValue(NamedTuple):
     """Value of 1 unit of a commodity at a particular time."""
 
     time: datetime
-    commodity: str
+    name: str
     value: float
 
 

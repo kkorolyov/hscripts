@@ -67,10 +67,8 @@ def main():
                     transactions,
                     datetimeRangeDay(start, end),
                     lambda t: t.time,
-                    lambda t: t.account,
-                    lambda time, account, t: Transaction(
-                        time, account, t.commodity, t.quantity
-                    ),
+                    lambda t: (t.account, t.commodity),
+                    lambda time, group, _: Transaction(time, *group, 0.0),
                 )
             ),
             lambda t: (t.account, t.commodity),
@@ -81,13 +79,13 @@ def main():
     print(f"filled to total {len(transactions)} transactions")
 
     commodityValues = {
-        (t.time, t.commodity): t
+        (t.time, t.name): t
         for t in fill(
             commodityValues,
             datetimeRangeDay(start, end),
             lambda t: t.time,
-            lambda t: t.commodity,
-            lambda time, commodity, t: CommodityValue(time, commodity, t.value),
+            lambda t: t.name,
+            lambda time, name, t: CommodityValue(time, name, t.value),
         )
     }
     print(f"filled to total {len(commodityValues)} commodity values")
@@ -102,7 +100,7 @@ def main():
             )
             .field("total", total)
             .field("value", total * commodityValues[(t.time, t.commodity)].value)
-            .tag("name", t.account)
+            .tag("account", t.account)
             .tag("commodity", t.commodity)
             .time(t.time)
             for t, total in transactions
@@ -110,7 +108,7 @@ def main():
         *(
             Point.measurement("commodity")
             .field("value", t.value)
-            .tag("name", t.commodity)
+            .tag("name", t.name)
             .time(t.time)
             for t in commodityValues.values()
         ),
