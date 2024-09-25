@@ -118,9 +118,12 @@ def main():
 
     # write to InfluxDB
     with InfluxDBClient(args.url, args.token, org=args.org, timeout=60000) as client:
-        print(f"writing {len(points)} points...")
         with client.write_api(write_options=SYNCHRONOUS) as api:
-            api.write(args.bucket, record=points)
+            chunkSize = 10000
+            print(f"writing {len(points)} points in chunks of {chunkSize}...")
+            for i in range(0, len(points), chunkSize):
+                api.write(args.bucket, record=points[i : i + chunkSize])
+                print(f"wrote chunk {i // chunkSize}")
 
 
 if __name__ == "__main__":
