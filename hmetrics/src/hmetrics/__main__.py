@@ -1,6 +1,7 @@
 from argparse import ArgumentParser, RawTextHelpFormatter
 from datetime import timedelta
 from os import environ
+from time import sleep
 
 from influxdb_client.client.influxdb_client import InfluxDBClient
 from influxdb_client.client.write.point import Point
@@ -31,6 +32,14 @@ def _parseArgs():
     )
     parser.add_argument(
         "-b", "--bucket", type=str, help="InfluxDB bucket to write to", required=True
+    )
+    parser.add_argument(
+        "-c",
+        "--chunk",
+        type=int,
+        help="number of points written to InfluxDB per batch",
+        required=True,
+        default=5000,
     )
 
     return parser.parse_args()
@@ -94,14 +103,11 @@ def main():
     points = [
         *(
             Point.measurement("transaction")
-            .field("change", t.quantity)
-            .field(
-                "change_v", t.quantity * commodityValues[(t.time, t.commodity)].value
-            )
             .field("total", total)
             .field("value", total * commodityValues[(t.time, t.commodity)].value)
             .tag("account", t.account)
             .tag("commodity", t.commodity)
+            .tag("type", t.account[0 : t.account.index(":")])
             .time(t.time)
             for t, total in transactions
         ),
@@ -109,6 +115,7 @@ def main():
             Point.measurement("commodity")
             .field("value", t.value)
             .tag("name", t.name)
+            .tag("type", commodity.typeOf(t.name))
             .time(t.time)
             for t in commodityValues.values()
         ),
@@ -117,11 +124,11 @@ def main():
     # write to InfluxDB
     with InfluxDBClient(args.url, args.token, org=args.org, timeout=60000) as client:
         with client.write_api(write_options=SYNCHRONOUS) as api:
-            chunkSize = 10000
-            print(f"writing {len(points)} points in chunks of {chunkSize}...")
-            for i in range(0, len(points), chunkSize):
-                api.write(args.bucket, record=points[i : i + chunkSize])
-                print(f"wrote chunk {i // chunkSize}")
+            print(f"writing {len(points)} points in chunks of {args.chunk}...")
+            for i in range(0, len(points), args.chunk):
+                api.write(args.bucket, record=points[i : i + args.chunk])
+                print(f"wrote chunk {i // args.chunk}")
+                sleep(0.5)
 
 
 if __name__ == "__main__":
