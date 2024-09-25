@@ -1,73 +1,46 @@
-import datetime
-import re
-from functools import cache
-from typing import cast
+"""Provides commodity data."""
 
-from pandas import DataFrame, to_datetime
-from yfinance import Ticker
+from datetime import datetime
+from typing import Iterable, Iterator, Literal, NamedTuple
 
-_tickers: dict[str, DataFrame] = {}
-_tbillPattern = re.compile(".*\\((.*) - (.*)\\)")
+from hmetrics.util import datetimeRangeDay
+import yfinance
 
 
-def loadTicker(symbol: str, start: datetime.datetime, end: datetime.datetime):
-    """Fetches and stores ticker data for `symbol` from `start` to `end` (exclusive)"""
-    _tickers[symbol] = Ticker(symbol).history(
-        start=start,
-        end=end,
-        interval="1d",
-    )
+class CommodityValue(NamedTuple):
+    """Value of 1 unit of a commodity at a particular time."""
+
+    time: datetime
+    commodity: str
+    value: float
 
 
-def value(commodity: str, time: datetime.datetime) -> float:
-    """Returns the value of 1 unit of `commodity` at `time`."""
+def values(
+    commodities: Iterable[str], start: datetime, end: datetime
+) -> Iterator[CommodityValue]:
+    """Returns values of `commodities` from `start` (inclusive) to `end` (exclusive) on a 1-day interval."""
 
-    match typeOf(commodity):
-        case "stock":
-            return _stockValue(commodity, time)
-        case "tbill":
-            return _tbillValue(commodity, time)
-        case "bond":
-            return 1
-        case _:
-            return 1
+    byType: dict[Literal["intrinsic", "stock"], set[str]] = {}
+    for commodity in commodities:
+        byType.setdefault(typeOf(commodity), set()).add(commodity)
+
+    # intrinsics are always 1
+    for intrinsic in byType.get("intrinsic", set()):
+        for time in datetimeRangeDay(start, end):
+            yield CommodityValue(time, intrinsic, 1.0)
+
+    # fetch stocks in batch
+    for symbol, prices in yfinance.download(
+        byType.get("stock", set()), start, end, interval="1d"
+    ).Close.items():
+        for timestamp, price in prices.items():
+            yield CommodityValue(timestamp.to_pydatetime(), symbol, price)
 
 
-def typeOf(commodity: str):
+def typeOf(commodity: str) -> Literal["intrinsic", "stock"]:
     """Returns the general classification of `commodity`."""
 
-    if commodity == "USD":
-        return "base"
-    elif "TBill" in commodity:
-        return "tbill"
-    elif "Bond" in commodity:
-        return "bond"
+    if commodity == "USD" or "TBill" in commodity or "Bond" in commodity:
+        return "intrinsic"
     else:
         return "stock"
-
-
-@cache
-def _stockValue(symbol: str, time: datetime.datetime) -> float:
-    # get from preloaded ticker at date
-    df = _tickers[symbol]["Close"].tz_localize(None)
-    return (
-        cast(float, df[df.index.get_indexer([to_datetime(time)], method="pad")[0]])
-        if len(df)
-        else 0
-    )
-
-
-@cache
-def _tbillValue(commodity: str, time: datetime.datetime) -> float:
-    return 1
-    # parse maturity date from commodity
-    match = _tbillPattern.search(commodity)
-    if match is None:
-        raise RuntimeError(
-            f"tbill '{commodity}' does not match pattern /{_tbillPattern}/"
-        )
-
-    start = match.group(1)
-    end = match.group(2)
-
-    return 0 if start <= time.date().isoformat() < end else 1

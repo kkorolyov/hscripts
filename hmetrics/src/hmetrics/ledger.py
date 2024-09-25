@@ -1,20 +1,22 @@
+"""Provides ledger data."""
+
 import csv
-import datetime
 import subprocess
+from datetime import datetime
 from typing import NamedTuple
 
 
 class Transaction(NamedTuple):
     """A change in quantity of a commodity in an account at some time."""
 
-    time: datetime.datetime
+    time: datetime
     account: str
     commodity: str
     quantity: float
 
 
 class Ledger:
-    """Returns ledger data."""
+    """Returns ledger data from a given file."""
 
     path: str
 
@@ -49,9 +51,9 @@ class Ledger:
         next(reader)
 
         # combine transactions with same (account, date, commodity)
-        transactions: dict[tuple[str, datetime.datetime, str], Transaction] = {}
+        transactions: dict[tuple[str, datetime, str], Transaction] = {}
         for line in reader:
-            time = datetime.datetime.strptime(line[1], "%Y-%m-%d")
+            time = datetime.strptime(line[1], "%Y-%m-%d")
             account = line[4]
 
             quantityCommodity = line[5]
