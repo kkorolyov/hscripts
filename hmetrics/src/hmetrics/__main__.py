@@ -79,15 +79,13 @@ def main():
     print(f"filled to total {len(commodityValues)} commodity values")
 
     # split into timeseries samples
-    accountSamples: dict[tuple[str, str], list[tuple[Transaction, Decimal]]] = (
-        defaultdict(list)
+    accountSamples = defaultdict[tuple[str, str], list[tuple[Transaction, Decimal]]](
+        list
     )
     for t in transactions:
         accountSamples[(t[0].account, t[0].commodity)].append(t)
 
-    commodityValueSamples: dict[tuple[str, str], list[CommodityValue]] = defaultdict(
-        list
-    )
+    commodityValueSamples = defaultdict[tuple[str, str], list[CommodityValue]](list)
     for t in commodityValues.values():
         commodityValueSamples[(t.name, commodity.typeOf(t.name))].append(t)
 
@@ -110,7 +108,12 @@ def main():
                 "finances_account_value",
                 labels,
                 {
-                    t.time: total * commodityValues[(t.time, t.commodity)].value
+                    t.time: total
+                    * (
+                        commodityValues[(t.time, t.commodity)].value
+                        if (t.time, t.commodity) in commodityValues
+                        else 0
+                    )
                     for t, total in samples
                 },
             )
@@ -118,9 +121,6 @@ def main():
         for group, samples in commodityValueSamples.items():
             labels = dict(zip(("name", "type"), group))
             samples = list(samples)
-            print(
-                f"pushing {len(samples)} samples for commodity timeseries with labels[{labels}]"
-            )
 
             c.push(
                 "finances_commodity_value",

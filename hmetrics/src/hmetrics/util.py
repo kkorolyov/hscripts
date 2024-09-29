@@ -46,7 +46,7 @@ def fill(
 
     indices = list(indices)
 
-    groups: dict[G, list[T]] = defaultdict(list)
+    groups = defaultdict[G, list[T]](list)
     for item in items:
         groups[groupBy(item)].append(item)
 

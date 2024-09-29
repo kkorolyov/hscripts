@@ -24,11 +24,40 @@ N = TypeVar("N", bound=Numeric[Any])
 @contextmanager
 def client(url: str):
     """Returns a metrics client sending metrics to `url`."""
-    res = VmClient(url)
+    res = Prometheus()
     try:
         yield res
     finally:
         res.flush()
+
+
+class Prometheus:
+    """Pushes metrics to Prometheus."""
+
+    _buffer = defaultdict[str, list[str]](list)
+
+    def get(self, pattern: str) -> Iterable[str]:
+        return []
+
+    def delete(self, pattern: str):
+        return
+
+    def push(self, name: str, labels: dict[S, str], samples: dict[datetime, N]):
+        labelsStr = ",".join((f'{k}="{v}"' for k, v in labels.items()))
+        self._buffer[name].extend(
+            (
+                f"{name}{{{labelsStr}}} {round(v, 2)} {int(k.timestamp())}"
+                for k, v in samples.items()
+            )
+        )
+
+    def flush(self):
+        with open("om.txt", "w") as f:
+            for name, lines in self._buffer.items():
+                f.write(f"# TYPE {name} gauge\n")
+                f.write("\n".join(lines))
+                f.write("\n")
+            f.write("# EOF\n")
 
 
 class VmClient:
@@ -66,7 +95,7 @@ class VmClient:
 
         # ensure individual line items are within timeBucket
         offset = min(samples.keys())
-        bucketedSamples: dict[int, list[tuple[datetime, N]]] = defaultdict(list)
+        bucketedSamples = defaultdict[int, list[tuple[datetime, N]]](list)
         for k, v in samples.items():
             bucketedSamples[(k - offset).days // self._timeBucketDays].append((k, v))
 
