@@ -1,15 +1,13 @@
 from argparse import ArgumentParser, RawTextHelpFormatter
-from datetime import timedelta
+from collections import defaultdict
+from datetime import datetime, timedelta
+from decimal import Decimal
 from os import environ
-from time import sleep
-
-from influxdb_client.client.influxdb_client import InfluxDBClient
-from influxdb_client.client.write.point import Point
-from influxdb_client.client.write_api import SYNCHRONOUS
 
 from hmetrics import commodity
 from hmetrics.commodity import CommodityValue
 from hmetrics.ledger import Ledger, Transaction
+from hmetrics.metrics import client
 from hmetrics.util import cumulativeSum, datetimeRangeDay, fill
 
 
@@ -21,26 +19,7 @@ def _parseArgs():
     parser.add_argument(
         "-i", "--input", type=str, help="ledger file to read; defaults to $LEDGER_FILE"
     )
-    parser.add_argument(
-        "-u", "--url", type=str, help="InfluxDB URL to write to", required=True
-    )
-    parser.add_argument(
-        "-t", "--token", type=str, help="InfluxDB token to use", required=True
-    )
-    parser.add_argument(
-        "-o", "--org", type=str, help="InfluxDB org to write to", required=True
-    )
-    parser.add_argument(
-        "-b", "--bucket", type=str, help="InfluxDB bucket to write to", required=True
-    )
-    parser.add_argument(
-        "-c",
-        "--chunk",
-        type=int,
-        help="number of points written to InfluxDB per batch",
-        required=True,
-        default=5000,
-    )
+    parser.add_argument("-u", "--url", type=str, help="URL to write to", required=True)
 
     return parser.parse_args()
 
@@ -57,7 +36,7 @@ def main():
     assets = list(ledger.transactions("assets"))
 
     # combine all transactions for further processing
-    transactions = [*assets]
+    transactions = [t for t in [*assets] if t.time <= datetime.now()]
     start = min(transactions, key=lambda t: t.time).time
     end = max(transactions, key=lambda t: t.time).time + timedelta(days=1)
     print(f"found {len(transactions)} transactions from {start} - {end}")
@@ -77,12 +56,12 @@ def main():
                     datetimeRangeDay(start, end),
                     lambda t: t.time,
                     lambda t: (t.account, t.commodity),
-                    lambda time, group, _: Transaction(time, *group, 0.0),
+                    lambda time, group, _: Transaction(time, *group, Decimal(0)),
                 )
             ),
             lambda t: (t.account, t.commodity),
             lambda t: t.quantity,
-            0.0,
+            Decimal(0),
         )
     )
     print(f"filled to total {len(transactions)} transactions")
@@ -99,36 +78,55 @@ def main():
     }
     print(f"filled to total {len(commodityValues)} commodity values")
 
-    # generate points to write
-    points = [
-        *(
-            Point.measurement("transaction")
-            .field("total", total)
-            .field("value", total * commodityValues[(t.time, t.commodity)].value)
-            .tag("account", t.account)
-            .tag("commodity", t.commodity)
-            .tag("type", t.account[0 : t.account.index(":")])
-            .time(t.time)
-            for t, total in transactions
-        ),
-        *(
-            Point.measurement("commodity")
-            .field("value", t.value)
-            .tag("name", t.name)
-            .tag("type", commodity.typeOf(t.name))
-            .time(t.time)
-            for t in commodityValues.values()
-        ),
-    ]
+    # split into timeseries samples
+    accountSamples: dict[tuple[str, str], list[tuple[Transaction, Decimal]]] = (
+        defaultdict(list)
+    )
+    for t in transactions:
+        accountSamples[(t[0].account, t[0].commodity)].append(t)
 
-    # write to InfluxDB
-    with InfluxDBClient(args.url, args.token, org=args.org, timeout=60000) as client:
-        with client.write_api(write_options=SYNCHRONOUS) as api:
-            print(f"writing {len(points)} points in chunks of {args.chunk}...")
-            for i in range(0, len(points), args.chunk):
-                api.write(args.bucket, record=points[i : i + args.chunk])
-                print(f"wrote chunk {i // args.chunk}")
-                sleep(0.5)
+    commodityValueSamples: dict[tuple[str, str], list[CommodityValue]] = defaultdict(
+        list
+    )
+    for t in commodityValues.values():
+        commodityValueSamples[(t.name, commodity.typeOf(t.name))].append(t)
+
+    # write metrics
+    with client(args.url) as c:
+        # delete current samples
+        c.delete("finances.*")
+
+        # write fresh samples
+        for group, samples in accountSamples.items():
+            labels = dict(zip(("name", "commodity"), group))
+            samples = list(samples)
+
+            c.push(
+                "finances_account_total",
+                labels,
+                {t.time: total for t, total in samples},
+            )
+            c.push(
+                "finances_account_value",
+                labels,
+                {
+                    t.time: total * commodityValues[(t.time, t.commodity)].value
+                    for t, total in samples
+                },
+            )
+
+        for group, samples in commodityValueSamples.items():
+            labels = dict(zip(("name", "type"), group))
+            samples = list(samples)
+            print(
+                f"pushing {len(samples)} samples for commodity timeseries with labels[{labels}]"
+            )
+
+            c.push(
+                "finances_commodity_value",
+                labels,
+                {t.time: t.value for t in samples},
+            )
 
 
 if __name__ == "__main__":

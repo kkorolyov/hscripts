@@ -3,6 +3,7 @@
 import csv
 import subprocess
 from datetime import datetime
+from decimal import Decimal
 from typing import NamedTuple
 
 
@@ -12,7 +13,7 @@ class Transaction(NamedTuple):
     time: datetime
     account: str
     commodity: str
-    quantity: float
+    quantity: Decimal
 
 
 class Ledger:
@@ -59,10 +60,10 @@ class Ledger:
             quantityCommodity = line[5]
             if " " in quantityCommodity:
                 splitI = quantityCommodity.index(" ")
-                quantity = float(quantityCommodity[:splitI])
+                quantity = Decimal(quantityCommodity[:splitI])
                 commodity = quantityCommodity[(splitI + 1) :].replace('"', "")
             else:
-                quantity = float(quantityCommodity)
+                quantity = Decimal(quantityCommodity)
                 commodity = "USD"
 
             key = (account, time, commodity)

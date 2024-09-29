@@ -1,5 +1,6 @@
 """Miscellaneous utility functions."""
 
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any, Callable, Iterable, Iterator, Protocol, TypeVar
 
@@ -45,9 +46,9 @@ def fill(
 
     indices = list(indices)
 
-    groups: dict[G, list[T]] = {}
+    groups: dict[G, list[T]] = defaultdict(list)
     for item in items:
-        groups.setdefault(groupBy(item), []).append(item)
+        groups[groupBy(item)].append(item)
 
     for groupKey, group in groups.items():
         group.sort(key=indexBy)
@@ -80,3 +81,19 @@ def cumulativeSum(
         totals[k] = total
 
         yield (item, total)
+
+
+def partition(items: Iterable[T], size: int):
+    """Returns `items` in groups of at most `size`."""
+
+    buffer: list[T] = []
+    for item in items:
+        if len(buffer) >= size:
+            yield buffer
+            buffer.clear()
+
+        buffer.append(item)
+
+    # and the remainder
+    if len(buffer):
+        yield buffer

@@ -1,10 +1,12 @@
 """Provides commodity data."""
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Iterable, Iterator, Literal, NamedTuple
 
-from hmetrics.util import datetimeRangeDay
 import yfinance
+
+from hmetrics.util import datetimeRangeDay
 
 
 class CommodityValue(NamedTuple):
@@ -12,7 +14,7 @@ class CommodityValue(NamedTuple):
 
     time: datetime
     name: str
-    value: float
+    value: Decimal
 
 
 def values(
@@ -27,14 +29,16 @@ def values(
     # intrinsics are always 1
     for intrinsic in byType.get("intrinsic", set()):
         for time in datetimeRangeDay(start, end):
-            yield CommodityValue(time, intrinsic, 1.0)
+            yield CommodityValue(time, intrinsic, Decimal(1))
 
     # fetch stocks in batch
-    for symbol, prices in yfinance.download(
-        byType.get("stock", set()), start, end, interval="1d"
-    ).Close.items():
+    for symbol, prices in (
+        yfinance.download(byType.get("stock", set()), start, end, interval="1d")
+        .Close.fillna(0)
+        .items()
+    ):
         for timestamp, price in prices.items():
-            yield CommodityValue(timestamp.to_pydatetime(), symbol, price)
+            yield CommodityValue(timestamp.to_pydatetime(), symbol, Decimal(price))
 
 
 def typeOf(commodity: str) -> Literal["intrinsic", "stock"]:
