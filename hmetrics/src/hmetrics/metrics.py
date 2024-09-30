@@ -1,8 +1,8 @@
 import json
 from collections import defaultdict
 from contextlib import contextmanager
-from datetime import datetime
-from time import sleep
+from datetime import date
+from time import mktime, sleep
 from typing import Any, Iterable, Protocol, TypeVar
 
 import requests
@@ -24,7 +24,7 @@ N = TypeVar("N", bound=Numeric[Any])
 @contextmanager
 def client(url: str):
     """Returns a metrics client sending metrics to `url`."""
-    res = Prometheus()
+    res = Prometheus(url)
     try:
         yield res
     finally:
@@ -34,38 +34,49 @@ def client(url: str):
 class Prometheus:
     """Pushes metrics to Prometheus."""
 
-    _buffer = defaultdict[str, list[str]](list)
+    _url: str
+    _buffer = list[str]()
+
+    def __init__(self, url: str) -> None:
+        self._url = url
 
     def get(self, pattern: str) -> Iterable[str]:
         return []
 
     def delete(self, pattern: str):
-        return
+        """Deletes samples for timeseries matching name `pattern`."""
 
-    def push(self, name: str, labels: dict[S, str], samples: dict[datetime, N]):
+        requests.post(
+            f"{self._url}/api/v1/admin/tsdb/delete_series",
+            {"match[]": f'{{__name__=~"{pattern}"}}'},
+        ).raise_for_status()
+        requests.post(
+            f"{self._url}/api/v1/admin/tsdb/clean_tombstones"
+        ).raise_for_status()
+
+        print(f"deleted metrics matching {pattern} at {self._url}")
+
+    def push(self, name: str, labels: dict[S, str], samples: dict[date, N]):
+        """Buffers `samples` for a timeseries of `name` and `labels` to send as part of the next `flush()`."""
+
         labelsStr = ",".join((f'{k}="{v}"' for k, v in labels.items()))
-        self._buffer[name].extend(
-            (
-                f"{name}{{{labelsStr}}} {round(v, 2)} {int(k.timestamp())}"
-                for k, v in samples.items()
+        for k, v in sorted(samples.items(), key=lambda t: t[0]):
+            self._buffer.append(
+                f"{name}{{{labelsStr}}} {round(v, 2)} {int(mktime(k.timetuple()))}"
             )
-        )
 
     def flush(self):
         with open("om.txt", "w") as f:
-            for name, lines in self._buffer.items():
-                f.write(f"# TYPE {name} gauge\n")
-                f.write("\n".join(lines))
-                f.write("\n")
-            f.write("# EOF\n")
+            f.write("\n".join(self._buffer))
+            f.write("\n# EOF\n")
 
 
 class VmClient:
     """Pushes metrics to VictoriaMetrics at a given url."""
 
     _url: str
-    _timeBucketDays: int = 30
-    _buffer: list[str] = []
+    _timeBucketDays = 30
+    _buffer = list[str]()
 
     def __init__(self, url: str) -> None:
         self._url = url
@@ -90,12 +101,12 @@ class VmClient:
 
         print(f"deleted metrics matching {pattern} at {self._url}")
 
-    def push(self, name: str, labels: dict[S, str], samples: dict[datetime, N]) -> None:
+    def push(self, name: str, labels: dict[S, str], samples: dict[date, N]) -> None:
         """Buffers `samples` for a timeseries of `name` and `labels` to send as part of the next `flush()`."""
 
         # ensure individual line items are within timeBucket
         offset = min(samples.keys())
-        bucketedSamples = defaultdict[int, list[tuple[datetime, N]]](list)
+        bucketedSamples = defaultdict[int, list[tuple[date, N]]](list)
         for k, v in samples.items():
             bucketedSamples[(k - offset).days // self._timeBucketDays].append((k, v))
 
@@ -105,7 +116,9 @@ class VmClient:
                     {
                         "metric": {"__name__": name, **labels},
                         "values": [float(round(v, 2)) for _, v in bucket],
-                        "timestamps": [int(k.timestamp() * 10**3) for k, _ in bucket],
+                        "timestamps": [
+                            int(mktime(k.timetuple()) * 10**3) for k, _ in bucket
+                        ],
                     }
                 )
             )
@@ -119,16 +132,19 @@ class VmClient:
 
         batchSize = 5000
         print(
-            f"flushing {len(self._buffer)} lines in {batchSize}-line batches to {self._url}..."
+            f"flushing {len([value for line in self._buffer for value in json.loads(line)['values']])} values over {len(self._buffer)} lines in {batchSize}-line batches to {self._url}..."
         )
 
         for lines in partition(self._buffer, batchSize):
             requests.post(
-                f"{self._url}/api/v1/import", "\n".join(lines).encode(), stream=True
+                f"{self._url}/api/v1/import",
+                "\n".join(lines).encode(),
+                stream=True,
+                timeout=300,
             ).raise_for_status()
 
             print("flushed a batch")
-            sleep(5)
+            sleep(10)
 
         print(f"flushed {len(self._buffer)} lines to {self._url}")
 

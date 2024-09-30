@@ -2,14 +2,14 @@
 
 import re
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from typing import Iterable, Iterator, Literal, NamedTuple
 
 import yfinance
 from pandas import isna
 
-from hmetrics.util import datetimeRangeDay
+from hmetrics.util import dateRange
 
 _tBillPattern = re.compile(".*\\((.*) - (.*)\\)")
 
@@ -17,13 +17,13 @@ _tBillPattern = re.compile(".*\\((.*) - (.*)\\)")
 class CommodityValue(NamedTuple):
     """Value of 1 unit of a commodity at a particular time."""
 
-    time: datetime
+    time: date
     name: str
     value: Decimal
 
 
 def values(
-    commodities: Iterable[str], start: datetime, end: datetime
+    commodities: Iterable[str], start: date, end: date
 ) -> Iterator[CommodityValue]:
     """Returns values of `commodities` from `start` (inclusive) to `end` (exclusive) on a 1-day interval."""
 
@@ -33,7 +33,7 @@ def values(
 
     # intrinsics are always 1
     for intrinsic in byType["intrinsic"]:
-        for time in datetimeRangeDay(start, end):
+        for time in dateRange(start, end):
             yield CommodityValue(time, intrinsic, Decimal(1))
 
     # use tbills' lifetime
@@ -42,29 +42,22 @@ def values(
         if match is None:
             raise RuntimeError(f"tbill does not match pattern: {tbill}")
         else:
-            for time in datetimeRangeDay(
-                max(
-                    start,
-                    datetime.combine(
-                        date.fromisoformat(match.group(1)), datetime.min.time()
-                    ),
-                ),
-                min(
-                    end,
-                    datetime.combine(
-                        date.fromisoformat(match.group(2)), datetime.min.time()
-                    ),
-                ),
+            for time in dateRange(
+                max(start, date.fromisoformat(match.group(1))),
+                min(end, date.fromisoformat(match.group(2))),
             ):
                 yield CommodityValue(time, tbill, Decimal(1))
 
     # fetch stocks in batch
-    for symbol, prices in yfinance.download(
-        byType["stock"], start, end, interval="1d"
-    ).Close.items():
-        for timestamp, price in prices.items():
-            if not isna(price):
-                yield CommodityValue(timestamp.to_pydatetime(), symbol, Decimal(price))
+    if len(byType["stock"]):
+        for symbol, prices in yfinance.download(
+            byType["stock"], start, end, interval="1d"
+        ).Close.items():
+            for timestamp, price in prices.items():
+                if not isna(price):
+                    yield CommodityValue(
+                        timestamp.to_pydatetime().date(), symbol, Decimal(price)
+                    )
 
 
 def typeOf(commodity: str):

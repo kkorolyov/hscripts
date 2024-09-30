@@ -2,7 +2,7 @@
 
 import csv
 import subprocess
-from datetime import datetime
+from datetime import date
 from decimal import Decimal
 from typing import NamedTuple
 
@@ -10,7 +10,7 @@ from typing import NamedTuple
 class Transaction(NamedTuple):
     """A change in quantity of a commodity in an account at some time."""
 
-    time: datetime
+    time: date
     account: str
     commodity: str
     quantity: Decimal
@@ -52,9 +52,9 @@ class Ledger:
         next(reader)
 
         # combine transactions with same (account, date, commodity)
-        transactions: dict[tuple[str, datetime, str], Transaction] = {}
+        transactions = dict[tuple[str, date, str], Transaction]()
         for line in reader:
-            time = datetime.strptime(line[1], "%Y-%m-%d")
+            time = date.fromisoformat(line[1])
             account = line[4]
 
             quantityCommodity = line[5]

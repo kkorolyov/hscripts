@@ -1,9 +1,8 @@
 """Miscellaneous utility functions."""
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date, timedelta
 from typing import Any, Callable, Iterable, Iterator, Protocol, TypeVar
-
 
 T = TypeVar("T")
 G = TypeVar("G")
@@ -24,10 +23,10 @@ class Comparable(Protocol[T_contra]):
 I = TypeVar("I", bound=Comparable[Any])
 
 
-def datetimeRangeDay(start: datetime, end: datetime) -> Iterator[datetime]:
-    """Returns all datetimes from `start` (inclusive) to `end` (exclusive) on a 1-day interval."""
+def dateRange(start: date, end: date, step: int = 1) -> Iterator[date]:
+    """Returns all datetimes from `start` (inclusive) to `end` (exclusive) on a `step` day interval."""
 
-    for i in range((end - start).days):
+    for i in range(0, (end - start).days, step):
         yield start + timedelta(days=i)
 
 

@@ -1,6 +1,6 @@
 from argparse import ArgumentParser, RawTextHelpFormatter
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal
 from os import environ
 
@@ -8,7 +8,7 @@ from hmetrics import commodity
 from hmetrics.commodity import CommodityValue
 from hmetrics.ledger import Ledger, Transaction
 from hmetrics.metrics import client
-from hmetrics.util import cumulativeSum, datetimeRangeDay, fill
+from hmetrics.util import cumulativeSum, dateRange, fill
 
 
 def _parseArgs():
@@ -36,7 +36,7 @@ def main():
     assets = list(ledger.transactions("assets"))
 
     # combine all transactions for further processing
-    transactions = [t for t in [*assets] if t.time <= datetime.now()]
+    transactions = [*assets]
     start = min(transactions, key=lambda t: t.time).time
     end = max(transactions, key=lambda t: t.time).time + timedelta(days=1)
     print(f"found {len(transactions)} transactions from {start} - {end}")
@@ -53,7 +53,7 @@ def main():
             sorted(
                 fill(
                     transactions,
-                    datetimeRangeDay(start, end),
+                    dateRange(start, end),
                     lambda t: t.time,
                     lambda t: (t.account, t.commodity),
                     lambda time, group, _: Transaction(time, *group, Decimal(0)),
@@ -70,7 +70,7 @@ def main():
         (t.time, t.name): t
         for t in fill(
             commodityValues,
-            datetimeRangeDay(start, end),
+            dateRange(start, end),
             lambda t: t.time,
             lambda t: t.name,
             lambda time, name, t: CommodityValue(time, name, t.value),
