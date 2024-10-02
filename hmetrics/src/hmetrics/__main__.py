@@ -33,10 +33,7 @@ def main():
     accounts = ledger.accounts()
     print(f"found {len(accounts)} accounts")
 
-    assets = list(ledger.transactions("assets"))
-
-    # combine all transactions for further processing
-    transactions = [*assets]
+    transactions = list(ledger.transactions())
     start = min(transactions, key=lambda t: t.time).time
     end = max(transactions, key=lambda t: t.time).time + timedelta(days=1)
     print(f"found {len(transactions)} transactions from {start} - {end}")

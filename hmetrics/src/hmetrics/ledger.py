@@ -35,13 +35,13 @@ class Ledger:
             .splitlines()
         )
 
-    def transactions(self, query: str) -> list[Transaction]:
-        """Returns transactions matching ledger `query`."""
+    def transactions(self) -> list[Transaction]:
+        """Returns transactions from ledger."""
 
         # returns in format (txnidx date code description account amount total)
         reader = csv.reader(
             subprocess.check_output(
-                ["hledger", "register", query, "-O", "tsv", "-f", self.path]
+                ["hledger", "register", "-O", "tsv", "-f", self.path]
             )
             .decode()
             .splitlines(),
