@@ -81,10 +81,12 @@ def main():
     )
     for t in transactions:
         accountSamples[(t[0].account, t[0].commodity)].append(t)
+    print(f"split transactions into {len(accountSamples)} time series")
 
     commodityValueSamples = defaultdict[tuple[str, str], list[CommodityValue]](list)
     for t in commodityValues.values():
         commodityValueSamples[(t.name, commodity.typeOf(t.name))].append(t)
+    print(f"split commodity values into {len(accountSamples)} time series")
 
     # write metrics
     with client(args.url) as c:
