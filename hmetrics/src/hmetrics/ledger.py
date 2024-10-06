@@ -6,6 +6,8 @@ from datetime import date
 from decimal import Decimal
 from typing import NamedTuple
 
+from hmetrics.commodity import CommodityValue
+
 
 class Transaction(NamedTuple):
     """A change in quantity of a commodity in an account at some time."""
@@ -34,6 +36,25 @@ class Ledger:
             .decode()
             .splitlines()
         )
+
+    def prices(self, commodity: str) -> list[CommodityValue]:
+        """Returns all commodity prices for `commodity` known or inferred in the ledger."""
+
+        reader = csv.reader(
+            subprocess.check_output(
+                ["hledger", "prices", "--infer-market-prices", f"cur:{commodity}"]
+            )
+            .decode()
+            .splitlines(),
+            delimiter=" ",
+        )
+
+        values = [
+            CommodityValue(date.fromisoformat(line[1]), commodity, Decimal(line[3]))
+            for line in reader
+        ]
+
+        return list({(t.name, t.time): t for t in values}.values())
 
     def transactions(self) -> list[Transaction]:
         """Returns transactions from ledger."""

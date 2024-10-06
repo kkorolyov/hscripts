@@ -43,6 +43,14 @@ def main():
     print(f"found {len(commodities)} distinct commodities")
 
     commodityValues = list(commodity.values(commodities, start, end))
+    # infer any remaining commodities from ledger
+    commodityValues.extend(
+        (
+            price
+            for c in (commodities - {t.name for t in commodityValues})
+            for price in ledger.prices(c)
+        )
+    )
     print(f"found {len(commodityValues)} commodity values")
 
     transactions = list(
@@ -96,7 +104,6 @@ def main():
         # write fresh samples
         for group, samples in accountSamples.items():
             labels = dict(zip(("name", "commodity"), group))
-            samples = list(samples)
 
             c.push(
                 "finances_account_total",
@@ -107,19 +114,13 @@ def main():
                 "finances_account_value",
                 labels,
                 {
-                    t.time: total
-                    * (
-                        commodityValues[(t.time, t.commodity)].value
-                        if (t.time, t.commodity) in commodityValues
-                        else 0
-                    )
+                    t.time: total * commodityValues[(t.time, t.commodity)].value
                     for t, total in samples
                 },
             )
 
         for group, samples in commodityValueSamples.items():
             labels = dict(zip(("name", "type"), group))
-            samples = list(samples)
 
             c.push(
                 "finances_commodity_value",
