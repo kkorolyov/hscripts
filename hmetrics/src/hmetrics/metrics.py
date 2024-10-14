@@ -56,9 +56,7 @@ class Promport:
                 f"{name}{{{labelsStr}}} {round(v, 2)} {int(mktime(k.timetuple()))}"
             )
 
-        print(
-            f"pushed metric {{{name}}} with {len(labels)} labels and {len(samples)} samples"
-        )
+        print(f"pushed timeseries {name}{labels} with {len(samples)} samples")
 
     def flush(self):
         with io.BytesIO(("\n".join(self._buffer) + "\n# EOF\n").encode()) as buffer:
