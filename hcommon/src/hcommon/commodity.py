@@ -12,6 +12,7 @@ from pandas import isna
 from hcommon.util import dateRange
 
 _tBillPattern = re.compile(".*\\((.*) - (.*)\\)")
+_stockPattern = re.compile("^[A-Z]+$")
 
 
 class CommodityValue(NamedTuple):
@@ -27,7 +28,7 @@ def values(
 ) -> Iterator[CommodityValue]:
     """Returns values of `commodities` from `start` (inclusive) to `end` (exclusive) on a 1-day interval."""
 
-    byType = defaultdict[Literal["intrinsic", "tbill", "stock"], set[str]](set)
+    byType = defaultdict[Literal["intrinsic", "tbill", "stock", "other"], set[str]](set)
     for commodity in commodities:
         byType[typeOf(commodity)].add(commodity)
 
@@ -67,5 +68,7 @@ def typeOf(commodity: str):
         return "intrinsic"
     elif "TBill" in commodity:
         return "tbill"
-    else:
+    elif _stockPattern.match(commodity):
         return "stock"
+    else:
+        return "other"

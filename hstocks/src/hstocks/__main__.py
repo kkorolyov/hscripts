@@ -1,93 +1,53 @@
 import argparse
 from datetime import datetime, timedelta
-import sys
+from os import environ
 
-from yfinance import Ticker
+from hcommon import commodity
+from hcommon.ledger import Ledger
 
 parser = argparse.ArgumentParser(
-    description="Fetches and appends stock closing prices to a ledger file",
-    formatter_class=argparse.RawTextHelpFormatter,
+    description="Updates stock closing prices in ledger files",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
 parser.add_argument(
-    "tickers",
+    "-i",
+    "--input",
     type=str,
-    nargs="*",
-    help="tickers to fetch",
+    default=environ["LEDGER_FILE"],
+    help="ledger file to read",
 )
 parser.add_argument(
     "-o",
     "--output",
     type=str,
     required=True,
-    help="ledger file to write output to",
+    help="ledger file to write",
 )
-parser.add_argument(
-    "-s",
-    "--start",
-    type=str,
-    help="start date in ISO (YYYY-MM-DD) format",
-    default=datetime.today().date().isoformat(),
-)
-parser.add_argument(
-    "-e",
-    "--end",
-    type=str,
-    help="end date in ISO (YYYY-MM-DD) format",
-    default=(datetime.today() + timedelta(days=1)).date().isoformat(),
-)
-parser.add_argument(
-    "-i",
-    "--interval",
-    type=str,
-    choices=["1d", "5d", "1wk", "1mo", "3mo"],
-    help="interval between fetched prices",
-    default="1d",
-)
-
-
-def fetch(ticker: str, start: str, end: str, interval: str):
-    print(f"fetching ticker: {ticker}...")
-
-    history = Ticker(ticker).history(
-        start=start, end=end, interval=interval, period="5d"
-    )
-
-    results = [
-        f"P {row.Index.date().isoformat()} {ticker} {row.Close}"
-        for row in history.itertuples()
-    ]
-
-    print(f"fetched {len(results)} results for ticker: {ticker}")
-
-    return "\n".join(results)
 
 
 def main():
     args = parser.parse_args()
 
-    tickers = (
-        args.tickers
-        if sys.stdin.isatty()
-        else [t for t in sys.stdin.read().splitlines() if len(t)]
-    )
-    output = args.output
-    start = args.start
-    end = args.end
-    interval = args.interval
+    ledger = Ledger(args.input)
+    transactions = list(ledger.transactions())
+    stocks = {t for t in ledger.commodities() if commodity.typeOf(t) == "stock"}
+    start = min(transactions, key=lambda t: t.time).time
+    end = max(
+        max(transactions, key=lambda t: t.time).time, datetime.today().date()
+    ) + timedelta(days=1)
 
-    print(f"fetching prices for {len(tickers)} tickers: {tickers}...")
-    results = [
-        t for t in (fetch(ticker, start, end, interval) for ticker in tickers) if len(t)
-    ]
-    print(f"fetched {len(results)} prices:")
+    print(f"getting stock prices for {len(stocks)} stocks from {start} to {end}")
+    newValues = sorted(set(commodity.values(stocks, start, end)) - set(ledger.prices()))
 
-    if len(results):
-        with open(output, "a") as f:
-            f.write("\n")
-            for result in results:
-                print(result)
-                f.write(result)
-                f.write("\n")
+    print(f"writing {len(newValues)} new values")
+
+    if len(newValues):
+        with open(args.output, "a") as f:
+            f.write(
+                "\n".join(
+                    ["", *(f"P {t.time} {t.name} {t.value}" for t in newValues), ""]
+                )
+            )
 
 
 if __name__ == "__main__":

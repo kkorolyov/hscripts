@@ -37,12 +37,21 @@ class Ledger:
             .splitlines()
         )
 
-    def prices(self, commodity: str) -> list[CommodityValue]:
-        """Returns all commodity prices for `commodity` known or inferred in the ledger."""
+    def commodities(self) -> list[str]:
+        """Returns all the commodities in the ledger."""
+
+        return (
+            subprocess.check_output(["hledger", "commodities", "-f", self.path])
+            .decode()
+            .splitlines()
+        )
+
+    def prices(self, infer: bool = False) -> list[CommodityValue]:
+        """Returns all commodity prices (optionally `infer`red) in the ledger."""
 
         reader = csv.reader(
             subprocess.check_output(
-                ["hledger", "prices", "--infer-market-prices", f"cur:{commodity}"]
+                ["hledger", "prices", "--infer-market-prices" if infer else ""]
             )
             .decode()
             .splitlines(),
@@ -50,7 +59,7 @@ class Ledger:
         )
 
         values = [
-            CommodityValue(date.fromisoformat(line[1]), commodity, Decimal(line[3]))
+            CommodityValue(date.fromisoformat(line[1]), line[2], Decimal(line[3]))
             for line in reader
         ]
 
