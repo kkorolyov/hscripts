@@ -1,0 +1,10 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hvests"
+version = "0.1.0"
+
+[project.scripts]
+hvests = "hvests.__main__:main"
