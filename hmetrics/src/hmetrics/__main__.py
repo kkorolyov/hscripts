@@ -17,9 +17,13 @@ def _parseArgs():
         formatter_class=RawTextHelpFormatter,
     )
     parser.add_argument(
-        "-i", "--input", type=str, help="ledger file to read; defaults to $LEDGER_FILE"
+        "-i",
+        "--input",
+        type=str,
+        default=environ["LEDGER_FILE"],
+        help="ledger file to read",
     )
-    parser.add_argument("-u", "--url", type=str, help="URL to write to", required=True)
+    parser.add_argument("-u", "--url", type=str, required=True, help="URL to write to")
 
     return parser.parse_args()
 
@@ -28,7 +32,7 @@ def main():
     args = _parseArgs()
 
     # fetch ledger data
-    ledger = Ledger(args.input or environ["LEDGER_FILE"])
+    ledger = Ledger(args.input)
 
     accounts = ledger.accounts()
     print(f"found {len(accounts)} accounts")
@@ -43,13 +47,10 @@ def main():
     print(f"found {len(commodities)} distinct commodities")
 
     commodityValues = list(commodity.values(commodities, start, end))
+    missingCommodities = commodities - {t.name for t in commodityValues}
     # infer any remaining commodities from ledger
     commodityValues.extend(
-        (
-            price
-            for c in (commodities - {t.name for t in commodityValues})
-            for price in ledger.prices(c)
-        )
+        t for t in ledger.prices(True) if t.name in missingCommodities
     )
     print(f"found {len(commodityValues)} commodity values")
 
