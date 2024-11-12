@@ -25,8 +25,7 @@ def formatVestForecast(period: str, shares: int, unit: str, company: str, accoun
   expenses:taxes:federal                {round(shares * .22)} {unit}
   expenses:taxes:state                  {round(shares * .1023)} {unit}
   expenses:taxes:vdi                    {round(shares * .0103)} {unit}
-  assets:investment:{account}
-"""
+  assets:investment:{account}"""
 
 
 def main():
