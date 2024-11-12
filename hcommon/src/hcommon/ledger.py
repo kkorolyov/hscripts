@@ -58,10 +58,20 @@ class Ledger:
             delimiter=" ",
         )
 
-        return [
-            CommodityValue(date.fromisoformat(line[1]), line[2], Decimal(line[3]))
-            for line in reader
-        ]
+        return list(
+            {
+                # keep only the last value of a (commodity, time) combo
+                (t.name, t.time): t
+                for t in (
+                    CommodityValue(
+                        date.fromisoformat(line[1]),
+                        line[2],
+                        Decimal(line[3].replace(",", "")),
+                    )
+                    for line in reader
+                )
+            }.values()
+        )
 
     def transactions(self) -> list[Transaction]:
         """Returns transactions from ledger."""

@@ -40,6 +40,15 @@ def main():
     transactions = ledger.transactions()
     start = min(transactions, key=lambda t: t.time).time
     end = max(transactions, key=lambda t: t.time).time + timedelta(days=1)
+    transactionStarts = {
+        (t.account, t.commodity): t.time for t in sorted(transactions, reverse=True)
+    }
+    commodityStarts = {
+        k[1]: v
+        for k, v in sorted(
+            transactionStarts.items(), key=lambda t: (t[0][1], t[1]), reverse=True
+        )
+    }
     print(f"found {len(transactions)} transactions from {start} - {end}")
 
     # fetch commodity values
@@ -47,13 +56,14 @@ def main():
     print(f"found {len(commodities)} distinct commodities")
 
     commodityValues = list(commodity.values(commodities, start, end))
-    missingCommodities = commodities - {t.name for t in commodityValues}
     # infer any remaining commodities from ledger
+    missingCommodities = commodities - {t.name for t in commodityValues}
     commodityValues.extend(
         t for t in ledger.prices(True) if t.name in missingCommodities
     )
     print(f"found {len(commodityValues)} commodity values")
 
+    # fill transaction gaps
     transactions = list(
         cumulativeSum(
             sorted(
@@ -70,8 +80,14 @@ def main():
             Decimal(0),
         )
     )
-    print(f"filled to total {len(transactions)} transactions")
+    # start transaction tracking only when its account-commodity combo first referenced in the ledger
+    transactions = [
+        (t, time)
+        for t, time in transactions
+        if t.time >= transactionStarts[(t.account, t.commodity)]
+    ]
 
+    # fill commodity gaps
     commodityValues = {
         (t.time, t.name): t
         for t in fill(
@@ -81,6 +97,10 @@ def main():
             lambda t: t.name,
             lambda time, name, t: CommodityValue(time, name, t.value),
         )
+    }
+    # start commodity tracking only when it's first referenced in the ledger
+    commodityValues = {
+        k: v for k, v in commodityValues.items() if k[0] >= commodityStarts[k[1]]
     }
     print(f"filled to total {len(commodityValues)} commodity values")
 
