@@ -30,14 +30,30 @@ def main():
 
     ledger = Ledger(args.input)
     transactions = list(ledger.transactions())
-    stocks = {t for t in ledger.commodities() if commodity.typeOf(t) == "stock"}
-    start = min(transactions, key=lambda t: t.time).time
+    stocks = {
+        t.commodity for t in transactions if commodity.typeOf(t.commodity) == "stock"
+    }
+    start = min(
+        (t for t in transactions if commodity.typeOf(t.commodity) == "stock"),
+        key=lambda t: t.time,
+    ).time
     end = max(
         max(transactions, key=lambda t: t.time).time, datetime.today().date()
     ) + timedelta(days=1)
 
     print(f"getting stock prices for {len(stocks)} stocks from {start} to {end}")
-    newValues = sorted(set(commodity.values(stocks, start, end)) - set(ledger.prices()))
+    # avoid overloading the journal - use sparser interval for historical prices
+    commodityStarts = {t.commodity: t.time for t in sorted(transactions, reverse=True)}
+    endHistorical = end - timedelta(days=90)
+    newValues = sorted(
+        t
+        for t in (
+            set(commodity.values(stocks, start, endHistorical + timedelta(days=1), 30))
+            | set(commodity.values(stocks, endHistorical, end, 1))
+            - set(ledger.prices())
+        )
+        if t.time >= commodityStarts[t.name]
+    )
 
     print(f"writing {len(newValues)} new values")
 

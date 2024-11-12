@@ -58,12 +58,10 @@ class Ledger:
             delimiter=" ",
         )
 
-        values = [
+        return [
             CommodityValue(date.fromisoformat(line[1]), line[2], Decimal(line[3]))
             for line in reader
         ]
-
-        return list({(t.name, t.time): t for t in values}.values())
 
     def transactions(self) -> list[Transaction]:
         """Returns transactions from ledger."""
