@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 from typing import NamedTuple
 
-from hmetrics.commodity import CommodityValue
+from hcommon.commodity import CommodityValue
 
 
 class Transaction(NamedTuple):

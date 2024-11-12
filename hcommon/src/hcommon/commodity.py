@@ -9,7 +9,7 @@ from typing import Iterable, Iterator, Literal, NamedTuple
 import yfinance
 from pandas import isna
 
-from hmetrics.util import dateRange
+from hcommon.util import dateRange
 
 _tBillPattern = re.compile(".*\\((.*) - (.*)\\)")
 

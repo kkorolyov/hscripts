@@ -5,7 +5,10 @@ build-backend = "hatchling.build"
 [project]
 name = "hstocks"
 version = "0.1.0"
-dependencies = ["yfinance"]
+dependencies = ["hcommon @ {root:parent:uri}/hcommon", "yfinance"]
 
 [project.scripts]
 hstocks = "hstocks.__main__:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
