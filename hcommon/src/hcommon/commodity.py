@@ -11,8 +11,8 @@ from pandas import isna
 
 from hcommon.util import dateRange
 
-_tBillPattern = re.compile("^.*\\((.*) - (.*)\\)$")
-_stockPattern = re.compile("^[A-Z]+$")
+_tBillPattern = re.compile(r"^.*\((.*) - (.*)\).*$")
+_stockPattern = re.compile(r"^[A-Z]+$")
 
 
 class CommodityValue(NamedTuple):

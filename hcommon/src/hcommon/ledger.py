@@ -1,6 +1,7 @@
 """Provides ledger data."""
 
 import csv
+import re
 import subprocess
 from datetime import date
 from decimal import Decimal
@@ -16,6 +17,13 @@ class Transaction(NamedTuple):
     account: str
     commodity: str
     quantity: Decimal
+
+
+class Stats(NamedTuple):
+    """Ledger statistics."""
+
+    start: date
+    end: date
 
 
 class Ledger:
@@ -117,3 +125,32 @@ class Ledger:
                 transactions[key] = Transaction(time, account, commodity, quantity)
 
         return list(transactions.values())
+
+    def stats(self) -> Stats:
+        """Returns ledger statistics."""
+
+        reader = csv.reader(
+            subprocess.check_output(
+                [
+                    "hledger",
+                    "stats",
+                    "-f",
+                    self.path,
+                ]
+            )
+            .decode()
+            .splitlines(),
+            delimiter=":",
+        )
+        start, end = (
+            date.fromisoformat(t)
+            for t in re.compile(r"\d{4}-\d{2}-\d{2}").findall(
+                next(
+                    line[1].strip()
+                    for line in reader
+                    if line[0].startswith("Txns span")
+                )
+            )
+        )
+
+        return Stats(start, end)
