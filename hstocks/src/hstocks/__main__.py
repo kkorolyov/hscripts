@@ -42,21 +42,28 @@ def main():
     ) + timedelta(days=1)
 
     print(f"getting stock prices for {len(stocks)} stocks from {start} to {end}")
-    # avoid overloading the journal - use sparser interval for historical prices
     commodityStarts = {t.commodity: t.time for t in sorted(transactions, reverse=True)}
     endHistorical = end - timedelta(days=90)
     newValues = sorted(
         t
         for t in (
-            set(commodity.values(stocks, start, endHistorical + timedelta(days=1), 30))
-            | set(commodity.values(stocks, endHistorical, end, 1))
+            # keep the journal thin - use sparser interval for historical prices
+            (
+                set(
+                    list(
+                        commodity.values(
+                            stocks, start, endHistorical + timedelta(days=1)
+                        )
+                    )[::30]
+                )
+                | set(commodity.values(stocks, endHistorical, end))
+            )
             - set(ledger.prices())
         )
         if t.time >= commodityStarts[t.name]
     )
 
     print(f"writing {len(newValues)} new values")
-
     if len(newValues):
         with open(args.output, "a") as f:
             f.write(

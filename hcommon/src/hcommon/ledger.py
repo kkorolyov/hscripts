@@ -49,12 +49,16 @@ class Ledger:
     def prices(self, infer: bool = False) -> list[CommodityValue]:
         """Returns all commodity prices (optionally `infer`red) in the ledger."""
 
+        args = [
+            "hledger",
+            "prices",
+            "-f",
+            self.path,
+        ]
+        if infer:
+            args.extend(("--infer-market-prices"))
         reader = csv.reader(
-            subprocess.check_output(
-                ["hledger", "prices", "--infer-market-prices" if infer else ""]
-            )
-            .decode()
-            .splitlines(),
+            subprocess.check_output(args).decode().splitlines(),
             delimiter=" ",
         )
 
@@ -73,16 +77,15 @@ class Ledger:
             }.values()
         )
 
-    def transactions(self) -> list[Transaction]:
-        """Returns transactions from ledger."""
+    def transactions(self, forecastOnly: bool = False) -> list[Transaction]:
+        """Returns transactions (optionally `forecastOnly`) from ledger."""
 
+        args = ["hledger", "register", "-O", "tsv", "-f", self.path]
+        if forecastOnly:
+            args.extend(("--forecast=2010..", "tag:generated"))
         # returns in format (txnidx date code description account amount total)
         reader = csv.reader(
-            subprocess.check_output(
-                ["hledger", "register", "-O", "tsv", "-f", self.path]
-            )
-            .decode()
-            .splitlines(),
+            subprocess.check_output(args).decode().splitlines(),
             delimiter="\t",
         )
 

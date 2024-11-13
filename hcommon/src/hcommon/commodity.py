@@ -11,7 +11,7 @@ from pandas import isna
 
 from hcommon.util import dateRange
 
-_tBillPattern = re.compile(".*\\((.*) - (.*)\\)")
+_tBillPattern = re.compile("^.*\\((.*) - (.*)\\)$")
 _stockPattern = re.compile("^[A-Z]+$")
 
 
@@ -39,7 +39,7 @@ def values(
 
     # use tbills' lifetime
     for tbill in byType["tbill"]:
-        match = _tBillPattern.search(tbill)
+        match = _tBillPattern.match(tbill)
         if match is None:
             raise RuntimeError(f"tbill does not match pattern: {tbill}")
         else:
