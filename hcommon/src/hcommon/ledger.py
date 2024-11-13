@@ -64,7 +64,7 @@ class Ledger:
             self.path,
         ]
         if infer:
-            args.extend(("--infer-market-prices"))
+            args.append("--infer-market-prices")
         reader = csv.reader(
             subprocess.check_output(args).decode().splitlines(),
             delimiter=" ",
