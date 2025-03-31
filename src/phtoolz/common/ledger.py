@@ -7,7 +7,7 @@ from datetime import date
 from decimal import Decimal
 from typing import NamedTuple
 
-from hcommon.commodity import CommodityValue
+from phtoolz.common.commodity import CommodityValue
 
 
 class Transaction(NamedTuple):

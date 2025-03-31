@@ -53,7 +53,7 @@ def formatTreasury(text: str):
         return [f'P {start} "{text}" 0', f'P {end} "{text}" 1']
 
 
-def main():
+def cli():
     args = parser.parse_args()
 
     commodities = fetchCommodities(args.input)

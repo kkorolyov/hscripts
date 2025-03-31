@@ -2,8 +2,8 @@ import argparse
 from datetime import datetime, timedelta
 from os import environ
 
-from hcommon import commodity
-from hcommon.ledger import Ledger
+from phtoolz.common import commodity
+from phtoolz.common.ledger import Ledger
 
 parser = argparse.ArgumentParser(
     description="Updates stock closing prices in ledger files",
@@ -25,7 +25,7 @@ parser.add_argument(
 )
 
 
-def main():
+def cli():
     args = parser.parse_args()
 
     ledger = Ledger(args.input)
@@ -74,4 +74,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    cli()

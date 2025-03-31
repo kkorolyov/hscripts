@@ -1,0 +1,14 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "phtoolz"
+version = "0.1.0"
+dependencies = ["requests", "yfinance"]
+
+[project.scripts]
+phmetrics = "phtoolz.__main__:metrics"
+phstocks = "phtoolz.__main__:stocks"
+phtreas = "phtoolz.__main__:treas"
+phvests = "phtoolz.__main__:vests"

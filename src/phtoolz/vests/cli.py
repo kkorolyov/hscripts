@@ -28,7 +28,7 @@ def formatVestForecast(period: str, shares: int, unit: str, company: str, accoun
   assets:investment:{account}"""
 
 
-def main():
+def cli():
     args = parser.parse_args()
     print(
         formatVestForecast(

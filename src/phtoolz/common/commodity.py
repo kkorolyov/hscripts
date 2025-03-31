@@ -9,7 +9,7 @@ from typing import Iterable, Iterator, Literal, NamedTuple
 import yfinance
 from pandas import isna
 
-from hcommon.util import dateRange
+from phtoolz.common.util import dateRange
 
 _tBillPattern = re.compile(r"^.*\((.*) - (.*)\).*$")
 _stockPattern = re.compile(r"^[A-Z]+$")

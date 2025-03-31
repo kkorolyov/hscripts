@@ -4,11 +4,11 @@ from datetime import timedelta
 from decimal import Decimal
 from os import environ
 
-from hcommon import commodity
-from hcommon.commodity import CommodityValue
-from hcommon.ledger import Ledger, Transaction
-from hcommon.util import cumulativeSum, dateRange, fill
-from hmetrics.metrics import client
+from phtoolz.common import commodity
+from phtoolz.common.commodity import CommodityValue
+from phtoolz.common.ledger import Ledger, Transaction
+from phtoolz.common.util import cumulativeSum, dateRange, fill
+from phtoolz.metrics.metrics import client
 
 
 def _parseArgs():
@@ -28,7 +28,7 @@ def _parseArgs():
     return parser.parse_args()
 
 
-def main():
+def cli():
     args = _parseArgs()
 
     # fetch ledger data
@@ -148,7 +148,3 @@ def main():
                 labels,
                 {t.time: t.value for t in samples},
             )
-
-
-if __name__ == "__main__":
-    main()
