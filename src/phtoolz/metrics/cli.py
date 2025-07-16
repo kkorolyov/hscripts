@@ -2,7 +2,6 @@ from argparse import ArgumentParser, RawTextHelpFormatter
 from collections import defaultdict
 from datetime import timedelta
 from decimal import Decimal
-from os import environ
 
 from phtoolz.common import commodity
 from phtoolz.common.commodity import CommodityValue
@@ -20,7 +19,6 @@ def _parseArgs():
         "-i",
         "--input",
         type=str,
-        default=environ["LEDGER_FILE"],
         help="ledger file to read",
     )
     parser.add_argument("-u", "--url", type=str, required=True, help="URL to write to")

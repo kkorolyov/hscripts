@@ -5,7 +5,7 @@ import re
 import subprocess
 from datetime import date
 from decimal import Decimal
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 
 from phtoolz.common.commodity import CommodityValue
 
@@ -31,7 +31,7 @@ class Ledger:
 
     path: str
 
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: Optional[str]) -> None:
         """Returns a ledger reading from file at `path`."""
 
         self.path = path
@@ -39,32 +39,30 @@ class Ledger:
     def accounts(self) -> list[str]:
         """Returns all the accounts in the ledger."""
 
-        return (
-            subprocess.check_output(["hledger", "accounts", "-f", self.path])
-            .decode()
-            .splitlines()
-        )
+        args = ["hledger", "accounts"]
+        if self.path:
+            args.extend(["-f", self.path])
+
+        return subprocess.check_output(args).decode().splitlines()
 
     def commodities(self) -> list[str]:
         """Returns all the commodities in the ledger."""
 
-        return (
-            subprocess.check_output(["hledger", "commodities", "-f", self.path])
-            .decode()
-            .splitlines()
-        )
+        args = ["hledger", "commodities"]
+        if self.path:
+            args.extend(["-f", self.path])
+
+        return subprocess.check_output(args).decode().splitlines()
 
     def prices(self, infer: bool = False) -> list[CommodityValue]:
         """Returns all commodity prices (optionally `infer`red) in the ledger."""
 
-        args = [
-            "hledger",
-            "prices",
-            "-f",
-            self.path,
-        ]
+        args = ["hledger", "prices"]
+        if self.path:
+            args.extend(["-f", self.path])
         if infer:
             args.append("--infer-market-prices")
+
         reader = csv.reader(
             subprocess.check_output(args).decode().splitlines(),
             delimiter=" ",
@@ -88,9 +86,12 @@ class Ledger:
     def transactions(self, forecastOnly: bool = False) -> list[Transaction]:
         """Returns transactions (optionally `forecastOnly`) from ledger."""
 
-        args = ["hledger", "register", "-O", "tsv", "-f", self.path]
+        args = ["hledger", "register", "-O", "tsv"]
+        if self.path:
+            args.extend(["-f", self.path])
         if forecastOnly:
             args.extend(("--forecast=2010..", "tag:generated"))
+
         # returns in format (txnidx date code description account amount total)
         reader = csv.reader(
             subprocess.check_output(args).decode().splitlines(),
@@ -129,17 +130,12 @@ class Ledger:
     def stats(self) -> Stats:
         """Returns ledger statistics."""
 
+        args = ["hledger", "stats"]
+        if self.path:
+            args.extend(["-f", self.path])
+
         reader = csv.reader(
-            subprocess.check_output(
-                [
-                    "hledger",
-                    "stats",
-                    "-f",
-                    self.path,
-                ]
-            )
-            .decode()
-            .splitlines(),
+            subprocess.check_output(args).decode().splitlines(),
             delimiter=":",
         )
         start, end = (

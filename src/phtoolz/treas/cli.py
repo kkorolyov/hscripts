@@ -1,7 +1,6 @@
 import argparse
 import re
-import subprocess
-from os import environ
+from phtoolz.common.ledger import Ledger
 
 TREASURY_PREFIX = "TBill"
 
@@ -13,7 +12,6 @@ parser.add_argument(
     "-i",
     "--input",
     type=str,
-    default=environ["LEDGER_FILE"],
     help="ledger file to read",
 )
 parser.add_argument(
@@ -21,13 +19,8 @@ parser.add_argument(
 )
 
 
-def fetchCommodities(path: str):
-    allCommodities = (
-        subprocess.check_output(["hledger", "commodities", "-f", path])
-        .decode()
-        .splitlines()
-    )
-    return set(t for t in allCommodities if t.startswith(TREASURY_PREFIX))
+def fetchCommodities(ledger: Ledger):
+    return set(t for t in ledger.commodities() if t.startswith(TREASURY_PREFIX))
 
 
 def fetchTreasuries(path: str):
@@ -56,7 +49,8 @@ def formatTreasury(text: str):
 def cli():
     args = parser.parse_args()
 
-    commodities = fetchCommodities(args.input)
+    ledger = Ledger(args.input)
+    commodities = fetchCommodities(ledger)
     treasuries = fetchTreasuries(args.output)
 
     newTreasuries = [formatTreasury(t) for t in commodities if t not in treasuries]

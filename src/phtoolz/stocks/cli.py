@@ -1,6 +1,5 @@
 import argparse
 from datetime import datetime, timedelta
-from os import environ
 
 from phtoolz.common import commodity
 from phtoolz.common.ledger import Ledger
@@ -13,7 +12,6 @@ parser.add_argument(
     "-i",
     "--input",
     type=str,
-    default=environ["LEDGER_FILE"],
     help="ledger file to read",
 )
 parser.add_argument(
@@ -71,7 +69,3 @@ def cli():
                     ["", *(f"P {t.time} {t.name} {t.value}" for t in newValues), ""]
                 )
             )
-
-
-if __name__ == "__main__":
-    cli()
